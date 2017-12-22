@@ -1,4 +1,4 @@
-package cron
+package kronasje
 
 import (
 	"testing"
@@ -10,39 +10,39 @@ type expectation = map[bool][]string
 type expectations = map[*regexp.Regexp]expectation
 
 var samples = expectations{
-	Every: {
+	every: {
 		true:  {"*"},
 		false: {"**", "2", "a"},
 	},
-	SingleOrDoubleDigit: {
+	singleOrDoubleDigit: {
 		true:  {"1", "2", "10", "12"},
 		false: {"a1", "123", "a", "."},
 	},
-	Step: {
+	step: {
 		true:  {"/2", "/28"},
 		false: {"/a", "2", "/123"},
 	},
-	EveryStep: {
+	everyStep: {
 		true:  {"*/2", "*/28"},
 		false: {"*/a", "2", "/123"},
 	},
-	Alias: {
+	alias: {
 		true:  {"abb", "man"},
 		false: {"m", "mann", "123"},
 	},
-	List: {
+	list: {
 		true:  {"1,2,3,4", "12,1,42,2"},
 		false: {"a,1,2,3", "1,2,3,", "123,2"},
 	},
-	RangeStep: {
+	rangeStep: {
 		true:  {"12-31/23", "1-2/2", "1-31/32"},
 		false: {"*/2", "1,2,4", "123"},
 	},
-	Range: {
+	numberRange: {
 		true:  {"1-2", "21-2"},
 		false: {"123-2", "5-123", "123-123"},
 	},
-	Name: {
+	name: {
 		true: {"@daily", "@annually", "@midnight", "@hourly"},
 		false: {"@every", "monday"},
 	},
@@ -62,44 +62,44 @@ func matchSamples(t *testing.T, r *regexp.Regexp) {
 }
 
 func TestEveryRegexp(t *testing.T) {
-	matchSamples(t, Every)
+	matchSamples(t, every)
 }
 
 func TestSingleOrDoubleDigitRexexp(t *testing.T) {
-	matchSamples(t, SingleOrDoubleDigit)
+	matchSamples(t, singleOrDoubleDigit)
 }
 
 func TestStepRegexp(t *testing.T) {
-	matchSamples(t, Step)
+	matchSamples(t, step)
 }
 
 func TestEveryStepRegexp(t *testing.T) {
-	matchSamples(t, EveryStep)
+	matchSamples(t, everyStep)
 }
 
 func TestAliasRegexp(t *testing.T) {
-	matchSamples(t, Alias)
+	matchSamples(t, alias)
 }
 
 func TestRangeRegexp(t *testing.T) {
-	matchSamples(t, Range)
+	matchSamples(t, numberRange)
 }
 
 func TestRangeStepRegexp(t *testing.T) {
-	matchSamples(t, RangeStep)
+	matchSamples(t, rangeStep)
 }
 
 func TestListRegexp(t *testing.T) {
-	matchSamples(t, List)
+	matchSamples(t, list)
 }
 
 func TestNameRegexp(t *testing.T) {
-	matchSamples(t, Range)
+	matchSamples(t, numberRange)
 }
 
 func TestEveryStepSubmatch(t *testing.T) {
 	expectedStep := uint64(32)
-	sub := EveryStep.FindStringSubmatch("*/32")
+	sub := everyStep.FindStringSubmatch("*/32")
 	if len(sub) != 2 {
 		t.Fatal("expected length of submatches", 2, "got", len(sub))
 	}
@@ -119,7 +119,7 @@ func TestRangeStepSubmatch(t *testing.T) {
 
 	s := "1-31/32"
 
-	sub := RangeStep.FindStringSubmatch(s)
+	sub := rangeStep.FindStringSubmatch(s)
 	if len(sub) != 4 {
 		t.Fatal("expected length of submatch", 4, "got", len(sub), s)
 	}

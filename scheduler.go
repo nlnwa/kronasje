@@ -1,23 +1,23 @@
-package cron
+package kronasje
 
 import (
 	"time"
 	"log"
 
-	. "github.com/nlnwa/sigridr/time"
+	. "github.com/nlnwa/kronasje/time"
 )
 
 type Schedule interface {
 	Next(now time.Time) time.Time
 }
 
-type BitCron struct {
-	Minute, Hour, Dom, Month, Dow uint64
+type bitCron struct {
+	minute, hour, dom, month, dow uint64
 }
 
 // diff answers the question: How many times must the given value's bit field
 // be shifted (and possibly wrapped) before this bit and the given field both are 1's.
-func diff(fieldSpec *FieldSpec, value int, field uint64) int {
+func diff(fieldSpec *fieldSpec, value int, field uint64) int {
 	b := bit(offset(fieldSpec, uint8(value)))
 	msb := bit(offset(fieldSpec, fieldSpec.Max)) // most significant bit for field
 
@@ -47,28 +47,28 @@ func diff(fieldSpec *FieldSpec, value int, field uint64) int {
 }
 
 // Find the next time the cron expression should run (could possibly be now).
-func (c *BitCron) Next(now time.Time) time.Time {
+func (c *bitCron) Next(now time.Time) time.Time {
 	t := now
 
 	// month, dom, dow, day, hour and minute variables represent diffs in this function
 
-	month := diff(spec.month, int(t.Month()), c.Month)
+	month := diff(spec.month, int(t.Month()), c.month)
 	if month > 0 {
 		t = time.Date(t.Year(), time.Month(int(t.Month())+month), 0, 0, 0, 0, 0, t.Location())
 	}
 
-	dom := diff(spec.dom, t.Day(), c.Dom)
+	dom := diff(spec.dom, t.Day(), c.dom)
 	// Adjust day of month because months can be 28, 29, 30 or 31 days long
 	// and the diff function is blind to this fact (it sees 31).
 	dom -= 31 - DaysIn(t.Month(), t.Year())
 
-	dow := diff(spec.month, int(t.Weekday())+1, c.Dow)
+	dow := diff(spec.month, int(t.Weekday())+1, c.dow)
 
 	// According to the crontab manual (man 5 crontab) if one of dom or dow equals every (*) the other one is used
 	day := 0
-	if c.Dom == bits(spec.dom.Max) {
+	if c.dom == bits(spec.dom.Max) {
 		day = dow
-	} else if c.Dow == bits(spec.dow.Max) {
+	} else if c.dow == bits(spec.dow.Max) {
 		day = dom
 	} else {
 		//  or else the earliest of dom and dow is used when neither of them are equal to every (*)
@@ -82,12 +82,12 @@ func (c *BitCron) Next(now time.Time) time.Time {
 		t = time.Date(t.Year(), t.Month(), t.Day()+day, 0, 0, 0, 0, t.Location())
 	}
 
-	hour := diff(spec.hour, t.Hour(), c.Hour)
+	hour := diff(spec.hour, t.Hour(), c.hour)
 	if hour > 0 {
 		t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour()+hour, 0, 0, 0, t.Location())
 	}
 
-	minute := diff(spec.minute, t.Minute(), c.Minute)
+	minute := diff(spec.minute, t.Minute(), c.minute)
 	if minute > 0 {
 		t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute()+minute, 0, 0, t.Location())
 	}

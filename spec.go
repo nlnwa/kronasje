@@ -1,4 +1,4 @@
-package cron
+package kronasje
 
 import (
 	"regexp"
@@ -9,41 +9,41 @@ import (
 // manual (man 5 crontab) dated 19 April 2010.
 
 const (
-	start               = `^`
-	end                 = `$`
-	every               = `\*`
-	singleOrDoubleDigit = `([\d]{1,2})`
-	alias               = `([[:alpha:]]{3})`
-	step                = `/` + singleOrDoubleDigit
-	numberRange         = singleOrDoubleDigit + `-` + singleOrDoubleDigit
-	list                = singleOrDoubleDigit + `(?:,\s*` + singleOrDoubleDigit + `)*`
-	name                = `@[[:alpha:]]+`
+	startExp               = `^`
+	endExp                 = `$`
+	everyExp               = `\*`
+	singleOrDoubleDigitExp = `([\d]{1,2})`
+	aliasExp               = `([[:alpha:]]{3})`
+	stepExp                = `/` + singleOrDoubleDigitExp
+	numberRangeExp         = singleOrDoubleDigitExp + `-` + singleOrDoubleDigitExp
+	listExp                = singleOrDoubleDigitExp + `(?:,\s*` + singleOrDoubleDigitExp + `)*`
+	nameExp                = `@[[:alpha:]]+`
 )
 
 var (
-	Every               = regexp.MustCompile(start + every + end)
-	Step                = regexp.MustCompile(start + step + end)
-	EveryStep           = regexp.MustCompile(start + every + step + end)
-	SingleOrDoubleDigit = regexp.MustCompile(start + singleOrDoubleDigit + end)
-	Alias               = regexp.MustCompile(start + alias + end)
-	Range               = regexp.MustCompile(start + numberRange + end)
-	List                = regexp.MustCompile(start + list + end)
-	RangeStep           = regexp.MustCompile(start + numberRange + step + end)
-	Name                = regexp.MustCompile(start + name + end)
+	every               = regexp.MustCompile(startExp + everyExp + endExp)
+	step                = regexp.MustCompile(startExp + stepExp + endExp)
+	everyStep           = regexp.MustCompile(startExp + everyExp + stepExp + endExp)
+	singleOrDoubleDigit = regexp.MustCompile(startExp + singleOrDoubleDigitExp + endExp)
+	alias               = regexp.MustCompile(startExp + aliasExp + endExp)
+	numberRange         = regexp.MustCompile(startExp + numberRangeExp + endExp)
+	list                = regexp.MustCompile(startExp + listExp + endExp)
+	rangeStep           = regexp.MustCompile(startExp + numberRangeExp + stepExp + endExp)
+	name                = regexp.MustCompile(startExp + nameExp + endExp)
 )
 
 // Days and months can be specified with named aliases such as "mon", "jan", etc.
-type Aliases map[string]uint8
+type aliases map[string]uint8
 
 // Every field has a minimum and maximum value and possibly aliases.
-type FieldSpec struct {
+type fieldSpec struct {
 	Min     uint8
 	Max     uint8
-	Aliases Aliases
+	Aliases aliases
 }
 
 // Unalias returns the value aliased as alias. Error returned if the field has no such alias or no aliases.
-func (f *FieldSpec) Unalias(alias string) (uint8, error) {
+func (f *fieldSpec) Unalias(alias string) (uint8, error) {
 	if f.Aliases == nil {
 		return 0, fmt.Errorf("field has no aliases")
 	}
@@ -55,7 +55,7 @@ func (f *FieldSpec) Unalias(alias string) (uint8, error) {
 }
 
 // InRange returns a boolean indicating if the given number lies in the range of the minimum and maximum value of the field spec.
-func (f *FieldSpec) InRange(number uint8) bool {
+func (f *fieldSpec) InRange(number uint8) bool {
 	if number < f.Min || number > f.Max {
 		return false
 	} else {
@@ -63,24 +63,24 @@ func (f *FieldSpec) InRange(number uint8) bool {
 	}
 }
 
-func (f *FieldSpec) String() string {
+func (f *fieldSpec) String() string {
 	return fmt.Sprintf("min %v, max %v, aliases %+v", f.Min, f.Max, f.Aliases)
 }
 
 type fields struct {
-	minute *FieldSpec
-	hour   *FieldSpec
-	dom    *FieldSpec
-	month  *FieldSpec
-	dow    *FieldSpec
+	minute *fieldSpec
+	hour   *fieldSpec
+	dom    *fieldSpec
+	month  *fieldSpec
+	dow    *fieldSpec
 }
 
 var spec = &fields{
-	minute: &FieldSpec{0, 59, nil},
-	hour:   &FieldSpec{0, 23, nil},
-	dom:    &FieldSpec{1, 31, nil},
-	month: &FieldSpec{1, 12,
-		Aliases{
+	minute: &fieldSpec{0, 59, nil},
+	hour:   &fieldSpec{0, 23, nil},
+	dom:    &fieldSpec{1, 31, nil},
+	month: &fieldSpec{1, 12,
+		aliases{
 			"jan": 1,
 			"feb": 2,
 			"mar": 3,
@@ -95,8 +95,8 @@ var spec = &fields{
 			"des": 12,
 		},
 	},
-	dow: &FieldSpec{0, 7,
-		Aliases{
+	dow: &fieldSpec{0, 7,
+		aliases{
 			"sun": 0,
 			"mon": 1,
 			"tue": 2,

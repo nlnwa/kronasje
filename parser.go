@@ -1,4 +1,4 @@
-package cron
+package kronasje
 
 import (
 	"fmt"
@@ -13,10 +13,10 @@ type Parser interface {
 
 type parser struct{}
 
-var cronParser = new(parser)
+var defaultParser = new(parser)
 
 func Parse(expression string) (Schedule, error) {
-	return cronParser.Parse(expression)
+	return defaultParser.Parse(expression)
 }
 
 // Parses a cron expression to a struct which represents the cron expression string as bitfields.
@@ -47,7 +47,7 @@ func (p *parser) Parse(expression string) (Schedule, error) {
 			return nil, err
 		}
 
-		return &BitCron{minute, hour, dom, month, dow}, nil
+		return &bitCron{minute, hour, dom, month, dow}, nil
 	}
 }
 
@@ -62,7 +62,7 @@ func (p *parser) parseNamedExpression(value string) (Schedule, error) {
 
 // offset increments the value by 1 if the spec minimum for the field is 0,
 // additionally if the field equals dow (day of week) then 7 (sunday's alternative value) is wrapped to 0.
-func offset(fieldSpec *FieldSpec, value uint8) uint8 {
+func offset(fieldSpec *fieldSpec, value uint8) uint8 {
 	sundayAsSeven := fieldSpec == spec.dow && value == fieldSpec.Max
 	if fieldSpec.Min == 0 && !sundayAsSeven {
 		return value + 1
@@ -110,11 +110,11 @@ func listField(values []uint8) uint64 {
 	return value
 }
 
-func parseEvery(fieldSpec *FieldSpec) (uint64, error) {
+func parseEvery(fieldSpec *fieldSpec) (uint64, error) {
 	return rangeField(offset(fieldSpec, fieldSpec.Min), offset(fieldSpec, fieldSpec.Max)), nil
 }
 
-func parseSingleOrDoubleDigit(value string, fieldSpec *FieldSpec) (uint64, error) {
+func parseSingleOrDoubleDigit(value string, fieldSpec *fieldSpec) (uint64, error) {
 	num, err := strconv.ParseUint(value, 10, 8)
 	if err != nil {
 		return 0, fmt.Errorf(err.Error())
@@ -126,8 +126,8 @@ func parseSingleOrDoubleDigit(value string, fieldSpec *FieldSpec) (uint64, error
 	}
 }
 
-func parseEveryStep(value string, fieldSpec *FieldSpec) (uint64, error) {
-	sub := EveryStep.FindStringSubmatch(value)
+func parseEveryStep(value string, fieldSpec *fieldSpec) (uint64, error) {
+	sub := everyStep.FindStringSubmatch(value)
 	step, err := strconv.ParseUint(sub[1], 10, 8)
 	if err != nil {
 		return 0, fmt.Errorf("%v", err)
@@ -135,8 +135,8 @@ func parseEveryStep(value string, fieldSpec *FieldSpec) (uint64, error) {
 	return stepField(offset(fieldSpec, fieldSpec.Min), offset(fieldSpec, fieldSpec.Max), uint8(step)), nil
 }
 
-func parseRange(value string, fieldSpec *FieldSpec) (uint64, error) {
-	sub := Range.FindStringSubmatch(value)
+func parseRange(value string, fieldSpec *fieldSpec) (uint64, error) {
+	sub := numberRange.FindStringSubmatch(value)
 	from, err := strconv.ParseUint(sub[1], 10, 8)
 	to, err := strconv.ParseUint(sub[2], 10, 8)
 	if err != nil {
@@ -151,8 +151,8 @@ func parseRange(value string, fieldSpec *FieldSpec) (uint64, error) {
 	return rangeField(offset(fieldSpec, uint8(from)), offset(fieldSpec, uint8(to))), nil
 }
 
-func parseRangeStep(value string, fieldSpec *FieldSpec) (uint64, error) {
-	sub := RangeStep.FindStringSubmatch(value)
+func parseRangeStep(value string, fieldSpec *fieldSpec) (uint64, error) {
+	sub := rangeStep.FindStringSubmatch(value)
 	from, err := strconv.ParseUint(sub[1], 10, 8)
 	to, err := strconv.ParseUint(sub[2], 10, 8)
 	step, err := strconv.ParseUint(sub[3], 10, 8)
@@ -168,7 +168,7 @@ func parseRangeStep(value string, fieldSpec *FieldSpec) (uint64, error) {
 	return stepField(offset(fieldSpec, uint8(from)), offset(fieldSpec, uint8(to)), uint8(step)), nil
 }
 
-func parseAlias(alias string, fieldSpec *FieldSpec) (uint64, error) {
+func parseAlias(alias string, fieldSpec *fieldSpec) (uint64, error) {
 	number, err := fieldSpec.Unalias(alias)
 	if err != nil {
 		fmt.Errorf("%v", err)
@@ -177,7 +177,7 @@ func parseAlias(alias string, fieldSpec *FieldSpec) (uint64, error) {
 }
 
 // NB: Doesn't allow ranges in the list
-func parseList(value string, fieldSpec *FieldSpec) (uint64, error) {
+func parseList(value string, fieldSpec *fieldSpec) (uint64, error) {
 	strValues := strings.Split(value, ",")
 	values := make([]uint8, len(strValues))
 	for i := range strValues {
@@ -193,28 +193,28 @@ func parseList(value string, fieldSpec *FieldSpec) (uint64, error) {
 	return listField(values), nil
 }
 
-// parseField parses any field of a BitCron expression
-func parseField(value string, fieldSpec *FieldSpec) (uint64, error) {
+// parseField parses any field of a bitCron expression
+func parseField(value string, fieldSpec *fieldSpec) (uint64, error) {
 	switch {
-	case Every.MatchString(value):
+	case every.MatchString(value):
 		return parseEvery(fieldSpec)
 
-	case SingleOrDoubleDigit.MatchString(value):
+	case singleOrDoubleDigit.MatchString(value):
 		return parseSingleOrDoubleDigit(value, fieldSpec)
 
-	case EveryStep.MatchString(value):
+	case everyStep.MatchString(value):
 		return parseEveryStep(value, fieldSpec)
 
-	case Range.MatchString(value):
+	case numberRange.MatchString(value):
 		return parseRange(value, fieldSpec)
 
-	case RangeStep.MatchString(value):
+	case rangeStep.MatchString(value):
 		return parseRangeStep(value, fieldSpec)
 
-	case Alias.MatchString(value):
+	case alias.MatchString(value):
 		return parseAlias(value, fieldSpec)
 
-	case List.MatchString(value):
+	case list.MatchString(value):
 		return parseList(value, fieldSpec)
 
 	default:
