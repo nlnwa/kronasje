@@ -8,6 +8,7 @@ import (
 // This spec tries to adhere to the 4th Berkely Distribution of the crontab
 // manual (man 5 crontab) dated 19 April 2010.
 
+// Regular expression strings
 const (
 	startExp               = `^`
 	endExp                 = `$`
@@ -42,8 +43,8 @@ type fieldSpec struct {
 	Aliases aliases
 }
 
-// Unalias returns the value aliased as alias. Error returned if the field has no such alias or no aliases.
-func (f *fieldSpec) Unalias(alias string) (uint8, error) {
+// Dealias returns the value aliased value by the given alias. Error returned if the field has no such alias or no aliases.
+func (f *fieldSpec) Dealias(alias string) (uint8, error) {
 	if f.Aliases == nil {
 		return 0, fmt.Errorf("field has no aliases")
 	}

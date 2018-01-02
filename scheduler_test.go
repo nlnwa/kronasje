@@ -15,19 +15,19 @@ func TestNext(t *testing.T) {
 	expected := now
 	equals(t, expected, schedule.Next(now))
 
-	// 2 minutes from now
+	// 2 minutes past every hour, day
 	schedule, err = Parse("2 * * * *")
 	ok(t, err)
 	expected = time.Date(2018, 1, 1, 0, 2, 0, 0, time.UTC)
 	equals(t, expected, schedule.Next(now))
 
-	// 2 minutes from now
-	schedule, err = Parse("2 * * * *")
+	// Every minute of the second hour of every day
+	schedule, err = Parse("* 2 * * *")
 	ok(t, err)
-	expected = time.Date(2018, 1, 1, 0, 2, 0, 0, time.UTC)
+	expected = time.Date(2018, 1, 1, 2, 0, 0, 0, time.UTC)
 	equals(t, expected, schedule.Next(now))
 
-	// first day of month
+	// Every minute of every hour of the 1st of every month
 	schedule, err = Parse("* * 1 * *")
 	ok(t, err)
 	expected = time.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC)

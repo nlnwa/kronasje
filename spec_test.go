@@ -159,10 +159,10 @@ func TestValidNumber(t *testing.T) {
 }
 
 func TestValidAlias(t *testing.T) {
-	if _, err := spec.dow.Unalias("mond"); err == nil {
+	if _, err := spec.dow.Dealias("mond"); err == nil {
 		t.Error("should error on invalid alias")
 	}
-	if _, err := spec.dow.Unalias("mon"); err != nil {
+	if _, err := spec.dow.Dealias("mon"); err != nil {
 		t.Error("mon should be a valid alias")
 	}
 }

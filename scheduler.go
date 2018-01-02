@@ -22,13 +22,14 @@ func diff(fieldSpec *fieldSpec, value int, field uint64) int {
 	msb := bit(offset(fieldSpec, fieldSpec.Max)) // most significant bit for field
 
 	// r is the number of values in the allowed range for the specified field, e.g. 0-59 -> 60, 1-31 -> 31.
+	// Since sunday can be both 0 and 7 we must not increment dow.
 	r := int(fieldSpec.Max)
-	if fieldSpec.Min == 0 {
+	if fieldSpec.Min == 0 && fieldSpec != spec.dow {
 		r += 1
 	}
 
-	// search for next bit in in field by starting at bit b and shifting to the left by one
-	// counting the number of shifts. wraps around when bit b equals max bit for field.
+	// search for next bit in in field by starting at bit b, counting the
+	// number of shifts until a 1 bit is found. wraps around when bit b equals max bit for field.
 	for i := 0; i < r; i++ {
 		if b&field > 0 {
 			return i
@@ -39,7 +40,7 @@ func diff(fieldSpec *fieldSpec, value int, field uint64) int {
 			b <<= 1 // shift
 		}
 	}
-	// should not happen unless field or value equals 0:
+	// should never happen unless field or value equals 0 (which should never happen):
 	// - a value of 0 should be offset to 1 above
 	// - a field of 0 should never be an output from the parser
 	log.Fatalf("diff should never be zero, %d, %b\n, %+v", value, field, fieldSpec)
@@ -68,7 +69,7 @@ func (c *bitCron) Next(now time.Time) time.Time {
 	day := 0
 	if c.dom == bits(spec.dom.Max) {
 		day = dow
-	} else if c.dow == bits(spec.dow.Max) {
+	} else if c.dow >= bits(spec.dow.Max) { // >= because every dow (*) yields 8 bits (because sunday can be both 0 and 7
 		day = dom
 	} else {
 		//  or else the earliest of dom and dow is used when neither of them are equal to every (*)

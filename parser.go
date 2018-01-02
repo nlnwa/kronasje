@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"strings"
 	"strconv"
-	"math"
 )
 
 type Parser interface {
-	Parse(expression string) *Schedule
+	Parse(string) Schedule
 }
 
 type parser struct{}
@@ -61,69 +60,36 @@ func (p *parser) parseNamedExpression(value string) (Schedule, error) {
 }
 
 // offset increments the value by 1 if the spec minimum for the field is 0,
-// additionally if the field equals dow (day of week) then 7 (sunday's alternative value) is wrapped to 0.
 func offset(fieldSpec *fieldSpec, value uint8) uint8 {
-	sundayAsSeven := fieldSpec == spec.dow && value == fieldSpec.Max
-	if fieldSpec.Min == 0 && !sundayAsSeven {
+	if fieldSpec.Min == 0 {
 		return value + 1
+	} else {
+		return value
 	}
-	return value
-}
-
-// bits return a bit field where all the bits less significant than or equal to the value bit is set to 1's.
-func bits(value uint8) uint64 {
-	return math.MaxUint64 >> (64 - value)
-}
-
-// bit returns the bit field where the bit number of the value is set to 1.
-func bit(value uint8) uint64 {
-	return 1 << (value - 1)
-}
-
-// field converts the value to a bit field
-func field(value uint8) uint64 {
-	return bit(value)
-}
-
-// rangeField returns a bit field where the bits higher than or equal to from and lower than or equal to to are set to 1's.
-func rangeField(from uint8, to uint8) uint64 {
-	if from == to {
-		return field(from)
-	}
-	return bits(to) ^ bits(from-1)
-}
-
-// rangeField returns a bit field where the bits including from are set to 1's at every step lower than or equal to to.
-func stepField(from uint8, to uint8, step uint8) uint64 {
-	value := uint64(0)
-	for i := from; i <= to; i = i + step {
-		value |= bit(i)
-	}
-	return value
-}
-
-func listField(values []uint8) uint64 {
-	var value uint64
-	for _, val := range values {
-		value |= bit(val)
-	}
-	return value
 }
 
 func parseEvery(fieldSpec *fieldSpec) (uint64, error) {
-	return rangeField(offset(fieldSpec, fieldSpec.Min), offset(fieldSpec, fieldSpec.Max)), nil
+	min := offset(fieldSpec, fieldSpec.Min)
+	max := offset(fieldSpec, fieldSpec.Max)
+	if fieldSpec == spec.dow {
+		max -= 1
+	}
+	return rangeField(min, max), nil
 }
 
 func parseSingleOrDoubleDigit(value string, fieldSpec *fieldSpec) (uint64, error) {
-	num, err := strconv.ParseUint(value, 10, 8)
+	parsedNumber, err := strconv.ParseUint(value, 10, 8)
+	num := uint8(parsedNumber)
 	if err != nil {
-		return 0, fmt.Errorf(err.Error())
+		return 0, fmt.Errorf("%v", err)
 	}
-	if !fieldSpec.InRange(uint8(num)) {
+	if !fieldSpec.InRange(num) {
 		return 0, fmt.Errorf("expected %d in the range %d-%d", num, fieldSpec.Min, fieldSpec.Max)
-	} else {
-		return field(offset(fieldSpec, uint8(num))), nil
 	}
+	if fieldSpec == spec.dow && num == spec.dow.Max {
+		num = 0 // wrap sunday (when valued as 7) to 0
+	}
+	return bit(offset(fieldSpec, num)), nil
 }
 
 func parseEveryStep(value string, fieldSpec *fieldSpec) (uint64, error) {
@@ -132,23 +98,38 @@ func parseEveryStep(value string, fieldSpec *fieldSpec) (uint64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("%v", err)
 	}
-	return stepField(offset(fieldSpec, fieldSpec.Min), offset(fieldSpec, fieldSpec.Max), uint8(step)), nil
+	from := offset(fieldSpec, fieldSpec.Min)
+	to := offset(fieldSpec, fieldSpec.Max)
+	if fieldSpec == spec.dow {
+		to -= 1 // shrink dow max to 0 (because sunday can be both 7 and 0)
+	}
+	return stepField(from, to, uint8(step)), nil
 }
 
 func parseRange(value string, fieldSpec *fieldSpec) (uint64, error) {
 	sub := numberRange.FindStringSubmatch(value)
-	from, err := strconv.ParseUint(sub[1], 10, 8)
-	to, err := strconv.ParseUint(sub[2], 10, 8)
+	parsedFrom, err := strconv.ParseUint(sub[1], 10, 8)
+	parsedTo, err := strconv.ParseUint(sub[2], 10, 8)
 	if err != nil {
 		return 0, fmt.Errorf("%v", err)
 	}
-	if !fieldSpec.InRange(uint8(from)) {
+	from := uint8(parsedFrom)
+	to := uint8(parsedTo)
+	if !fieldSpec.InRange(from) {
 		return 0, fmt.Errorf("expected %d in the range %d-%d", from, fieldSpec.Min, fieldSpec.Max)
 	}
-	if !fieldSpec.InRange(uint8(to)) {
+	if !fieldSpec.InRange(to) {
 		return 0, fmt.Errorf("expected %d in the range %d-%d", to, fieldSpec.Min, fieldSpec.Max)
 	}
-	return rangeField(offset(fieldSpec, uint8(from)), offset(fieldSpec, uint8(to))), nil
+	if from > to {
+		return 0, fmt.Errorf("from larger than to in range %d-%d", from, to)
+	}
+	if to == fieldSpec.Max && fieldSpec == spec.dow {
+		// wrap the last value in range to the beginning (because sunday can be 7)
+		return 1 + rangeField(offset(fieldSpec, from), offset(fieldSpec, to-1)), nil
+	} else {
+		return rangeField(offset(fieldSpec, from), offset(fieldSpec, to)), nil
+	}
 }
 
 func parseRangeStep(value string, fieldSpec *fieldSpec) (uint64, error) {
@@ -165,15 +146,23 @@ func parseRangeStep(value string, fieldSpec *fieldSpec) (uint64, error) {
 	if !fieldSpec.InRange(uint8(to)) {
 		return 0, fmt.Errorf("expected %d in the range %d-%d", to, fieldSpec.Min, fieldSpec.Max)
 	}
-	return stepField(offset(fieldSpec, uint8(from)), offset(fieldSpec, uint8(to)), uint8(step)), nil
+	bitField := stepField(offset(fieldSpec, uint8(from)), offset(fieldSpec, uint8(to)), uint8(step))
+	if fieldSpec.Max == uint8(to) && fieldSpec == spec.dow {
+		for i := int(fieldSpec.Max); i > 0; i -= int(step) {
+			if i == int(from) {
+				return 1 + bitField - bit(fieldSpec.Max+1), nil
+			}
+		}
+	}
+	return bitField, nil
 }
 
 func parseAlias(alias string, fieldSpec *fieldSpec) (uint64, error) {
-	number, err := fieldSpec.Unalias(alias)
+	number, err := fieldSpec.Dealias(alias)
 	if err != nil {
 		fmt.Errorf("%v", err)
 	}
-	return field(offset(fieldSpec, number)), nil
+	return bit(offset(fieldSpec, number)), nil
 }
 
 // NB: Doesn't allow ranges in the list
@@ -188,12 +177,15 @@ func parseList(value string, fieldSpec *fieldSpec) (uint64, error) {
 		if !fieldSpec.InRange(uint8(val)) {
 			return 0, fmt.Errorf("expected %d in the range %d-%d", val, fieldSpec.Min, fieldSpec.Max)
 		}
+		if fieldSpec == spec.dow && uint8(val) == spec.dow.Max {
+			val = 0 // wrap sunday (when valued as 7) to 0
+		}
 		values[i] = offset(fieldSpec, uint8(val))
 	}
 	return listField(values), nil
 }
 
-// parseField parses any field of a bitCron expression
+// parseField parses any field of a cron expression
 func parseField(value string, fieldSpec *fieldSpec) (uint64, error) {
 	switch {
 	case every.MatchString(value):
